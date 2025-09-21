@@ -19,9 +19,8 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (!existingProfile) {
-        // Create profile from user metadata - SECURE: Default to passenger, never trust client metadata for roles
+        // Create profile from user metadata - SECURITY: ALWAYS default to passenger, NEVER trust client for roles
         const userMetadata = data.user.user_metadata
-        const userType = userMetadata.registration_type === 'driver' ? 'driver' : 'passenger'
         
         const { error: profileError } = await supabase
           .from('profiles')
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
             full_name: userMetadata.full_name,
             email: data.user.email,
             phone: userMetadata.phone,
-            user_type: userType, // Only passenger or driver, never admin from client
+            user_type: 'passenger', // SECURITY: Always passenger by default - no client role assignment
             avatar_url: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -40,28 +39,11 @@ export async function GET(request: NextRequest) {
           console.error('Error creating profile:', profileError)
         }
 
-        // If user registered as driver, create driver profile entry
+        // SECURITY: If user wants to be a driver, store as pending application (not auto-approve)
         if (userMetadata.registration_type === 'driver') {
-          const { error: driverProfileError } = await supabase
-            .from('driver_profiles')
-            .insert({
-              user_id: data.user.id,
-              vehicle_make: '',
-              vehicle_model: '',
-              vehicle_year: null,
-              vehicle_color: '',
-              vehicle_plate: '',
-              license_number: '',
-              is_available: false,
-              rating: 5.0,
-              total_rides: 0,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-
-          if (driverProfileError) {
-            console.error('Error creating driver profile:', driverProfileError)
-          }
+          // TODO: Create pending driver application for admin review
+          // This would be stored in a separate table for approval workflow
+          console.log('Driver application submitted for:', data.user.id)
         }
       }
 
@@ -81,9 +63,14 @@ export async function GET(request: NextRequest) {
         userType = newProfile?.user_type || 'passenger'
       }
 
-      let redirectPath = next
+      // SECURITY: Whitelist safe redirect paths and ignore client-controlled 'next' for role-based routing
+      const safeRedirectPaths = ['/main', '/profile']
+      let redirectPath = '/main' // Default safe path
 
-      if (next === '/') {
+      if (next && safeRedirectPaths.includes(next)) {
+        redirectPath = next
+      } else {
+        // Role-based redirect (ignore potentially malicious 'next' parameter)
         switch (userType) {
           case 'driver':
             redirectPath = '/driver-profile'

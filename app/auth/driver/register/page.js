@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Mail, Lock, User, Phone, FileText, Car } from "lucide-react"
+import { Mail, User, Phone, FileText, Car } from "lucide-react"
 import { createClient } from '@/lib/supabase/client'
 
 import { Button } from "@/components/ui/buttons"
@@ -17,8 +17,6 @@ export default function DriverRegister() {
     name: "",
     email: "",
     phone: "",
-    password: "",
-    confirmPassword: "",
     driversLicense: null,
     insurance: null,
   })
@@ -37,19 +35,7 @@ export default function DriverRegister() {
     setError("")
     setSuccess("")
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      setLoading(false)
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters")
-      setLoading(false)
-      return
-    }
-
+    // Validation for document uploads (note: this is UI-only for now)
     if (!formData.driversLicense || !formData.insurance) {
       setError("Please upload both driver's license and insurance documents")
       setLoading(false)
@@ -59,15 +45,18 @@ export default function DriverRegister() {
     try {
       const supabase = createClient()
 
-      // Create auth user - DO NOT include user_type in metadata for security
-      const { data, error } = await supabase.auth.signUp({
+      // Create auth user with email OTP - DO NOT include user_type in metadata for security
+      const { error } = await supabase.auth.signInWithOtp({
         email: formData.email,
-        password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/main`,
           data: {
             full_name: formData.name,
             phone: formData.phone,
-            registration_type: 'driver' // Only for tracking registration intent
+            registration_type: 'driver',
+            is_new_user: true,
+            // Note: File uploads will be handled after email verification
+            has_documents: true
           }
         }
       })
@@ -77,13 +66,9 @@ export default function DriverRegister() {
         return
       }
 
-      if (data.user) {
-        setSuccess("Driver registration successful! Please check your email to verify your account. Your documents will be reviewed shortly.")
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          router.push('/auth/driver/login?message=Please verify your email to continue')
-        }, 3000)
-      }
+      setSuccess("Registration initiated! Please check your email for a secure registration link. Your driver application will be reviewed after email verification.")
+      // Clear the form
+      setFormData({ name: "", email: "", phone: "", driversLicense: null, insurance: null })
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {
@@ -92,7 +77,7 @@ export default function DriverRegister() {
   }
 
   return (
-    <AuthLayout title="Become a Driver" subtitle="Sign up to start earning with Ryde5">
+    <AuthLayout title="Become a Driver" subtitle="Enter your details and documents to receive a secure registration link">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Full Name</Label>
@@ -141,37 +126,6 @@ export default function DriverRegister() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="password"
-              type="password"
-              placeholder="Create a password"
-              className="pl-9"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm your password"
-              className="pl-9"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              required
-            />
-          </div>
-        </div>
 
         <div className="space-y-2">
           <Label htmlFor="driversLicense">Driver's License</Label>
@@ -218,7 +172,7 @@ export default function DriverRegister() {
         )}
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Creating Account..." : "Create Driver Account"}
+          {loading ? "Sending Registration Link..." : "Send Driver Registration Link"}
         </Button>
 
         <p className="text-sm text-center text-gray-600">

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Mail, Lock } from "lucide-react"
+import { Mail } from "lucide-react"
 import { createClient } from '@/lib/supabase/client'
 
 import { Button } from "@/components/ui/buttons"
@@ -15,21 +15,27 @@ export default function DriverLogin() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     email: "",
-    password: "",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError("")
+    setSuccess("")
 
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithOtp({
         email: formData.email,
-        password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/driver-profile`,
+          data: {
+            user_type_intent: 'driver' // Track login intent for verification
+          }
+        }
       })
 
       if (error) {
@@ -37,20 +43,7 @@ export default function DriverLogin() {
         return
       }
 
-      if (data.user) {
-        // Check user type from profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', data.user.id)
-          .single()
-
-        if (profile?.user_type === 'driver') {
-          router.push("/driver-profile")
-        } else {
-          setError("Please use the correct login page for your account type.")
-        }
-      }
+      setSuccess("Check your email for a secure login link!")
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {
@@ -59,7 +52,7 @@ export default function DriverLogin() {
   }
 
   return (
-    <AuthLayout title="Driver Sign In" subtitle="Sign in to your driver account to start accepting rides">
+    <AuthLayout title="Driver Sign In" subtitle="Enter your email to receive a secure login link">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -77,21 +70,6 @@ export default function DriverLogin() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              className="pl-9"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-            />
-          </div>
-        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -99,8 +77,14 @@ export default function DriverLogin() {
           </div>
         )}
 
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+            {success}
+          </div>
+        )}
+
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Signing In..." : "Sign In"}
+          {loading ? "Sending Login Link..." : "Send Secure Login Link"}
         </Button>
 
         <div className="text-center">

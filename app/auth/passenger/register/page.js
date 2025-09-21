@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Mail, Lock, User, Phone } from "lucide-react"
+import { Mail, User, Phone } from "lucide-react"
 import { createClient } from '@/lib/supabase/client'
 
 import { Button } from "@/components/ui/buttons"
@@ -17,8 +17,6 @@ export default function PassengerRegister() {
     name: "",
     email: "",
     phone: "",
-    password: "",
-    confirmPassword: "",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -30,30 +28,19 @@ export default function PassengerRegister() {
     setError("")
     setSuccess("")
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      setLoading(false)
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters")
-      setLoading(false)
-      return
-    }
-
     try {
       const supabase = createClient()
 
-      // Create auth user - DO NOT include user_type in metadata for security
-      const { data, error } = await supabase.auth.signUp({
+      // Create auth user with email OTP - DO NOT include user_type in metadata for security  
+      const { error } = await supabase.auth.signInWithOtp({
         email: formData.email,
-        password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/main`,
           data: {
             full_name: formData.name,
-            phone: formData.phone
+            phone: formData.phone,
+            registration_type: 'passenger',
+            is_new_user: true
           }
         }
       })
@@ -63,13 +50,9 @@ export default function PassengerRegister() {
         return
       }
 
-      if (data.user) {
-        setSuccess("Registration successful! Please check your email to verify your account.")
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          router.push('/auth/passenger/login?message=Please verify your email to continue')
-        }, 2000)
-      }
+      setSuccess("Registration initiated! Please check your email for a secure registration link to complete your account setup.")
+      // Clear the form
+      setFormData({ name: "", email: "", phone: "" })
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {
@@ -78,7 +61,7 @@ export default function PassengerRegister() {
   }
 
   return (
-    <AuthLayout title="Create Your Account" subtitle="Sign up as a passenger to start riding with us">
+    <AuthLayout title="Create Your Account" subtitle="Enter your details to receive a secure registration link">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Full Name</Label>
@@ -127,37 +110,6 @@ export default function PassengerRegister() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="password"
-              type="password"
-              placeholder="Create a password"
-              className="pl-9"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm your password"
-              className="pl-9"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              required
-            />
-          </div>
-        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -172,7 +124,7 @@ export default function PassengerRegister() {
         )}
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Creating Account..." : "Create Account"}
+          {loading ? "Sending Registration Link..." : "Send Registration Link"}
         </Button>
 
         <p className="text-sm text-center text-gray-600">
