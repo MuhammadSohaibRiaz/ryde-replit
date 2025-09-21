@@ -19,6 +19,7 @@ const nextConfig = {
     optimizeCss: true,
   },
   // Allow all hosts for Replit proxy
+  allowedDevOrigins: ['*', '127.0.0.1', 'localhost'],
   async headers() {
     return [
       {

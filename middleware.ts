@@ -6,6 +6,13 @@ export async function middleware(request: NextRequest) {
     request,
   })
 
+  // Check if Supabase credentials are available
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    // If Supabase is not configured, skip authentication middleware
+    console.warn('Supabase credentials not configured. Skipping authentication middleware.')
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
