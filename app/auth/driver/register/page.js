@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Mail, Lock, User, Phone, FileText, Car } from "lucide-react"
+import { createClient } from '@/lib/supabase/client'
 
 import { Button } from "@/components/ui/buttons"
 import { Input } from "@/components/ui/input"
@@ -10,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import AuthLayout from "@/components/auth/AuthLayout"
 
 export default function DriverRegister() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -19,6 +22,9 @@ export default function DriverRegister() {
     driversLicense: null,
     insurance: null,
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   const handleFileChange = (e, field) => {
     const file = e.target.files[0]
@@ -27,7 +33,62 @@ export default function DriverRegister() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    // Handle registration logic here
+    setLoading(true)
+    setError("")
+    setSuccess("")
+
+    // Validation
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match")
+      setLoading(false)
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters")
+      setLoading(false)
+      return
+    }
+
+    if (!formData.driversLicense || !formData.insurance) {
+      setError("Please upload both driver's license and insurance documents")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+
+      // Create auth user
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name,
+            phone: formData.phone,
+            user_type: 'driver'
+          }
+        }
+      })
+
+      if (error) {
+        setError(error.message)
+        return
+      }
+
+      if (data.user) {
+        setSuccess("Driver registration successful! Please check your email to verify your account. Your documents will be reviewed shortly.")
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/driver/login?message=Please verify your email to continue')
+        }, 3000)
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -144,8 +205,20 @@ export default function DriverRegister() {
           <p className="text-xs text-gray-500">Upload your current car insurance documentation</p>
         </div>
 
-        <Button type="submit" className="w-full">
-          Create Driver Account
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+            {success}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Creating Account..." : "Create Driver Account"}
         </Button>
 
         <p className="text-sm text-center text-gray-600">

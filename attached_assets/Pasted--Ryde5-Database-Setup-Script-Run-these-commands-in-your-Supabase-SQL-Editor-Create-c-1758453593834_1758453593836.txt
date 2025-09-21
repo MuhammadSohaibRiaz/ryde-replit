@@ -1,0 +1,315 @@
+-- Ryde5 Database Setup Script
+-- Run these commands in your Supabase SQL Editor
+
+
+
+-- Create custom types
+CREATE TYPE user_type AS ENUM ('passenger', 'driver', 'admin');
+CREATE TYPE ride_status AS ENUM ('pending', 'accepted', 'in_progress', 'completed', 'cancelled');
+CREATE TYPE payment_status AS ENUM ('pending', 'completed', 'failed');
+CREATE TYPE notification_type AS ENUM ('info', 'success', 'warning', 'error');
+
+-- Create profiles table (extends Supabase auth.users)
+CREATE TABLE profiles (
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    full_name TEXT,
+    avatar_url TEXT,
+    phone TEXT,
+    user_type user_type NOT NULL DEFAULT 'passenger',
+    is_verified BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true
+);
+
+-- Create driver profiles table
+CREATE TABLE driver_profiles (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE UNIQUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    license_number TEXT UNIQUE NOT NULL,
+    vehicle_make TEXT NOT NULL,
+    vehicle_model TEXT NOT NULL,
+    vehicle_year INTEGER NOT NULL,
+    vehicle_color TEXT NOT NULL,
+    license_plate TEXT UNIQUE NOT NULL,
+    is_available BOOLEAN DEFAULT true,
+    current_location JSONB,
+    rating DECIMAL(3,2) DEFAULT 5.0,
+    total_rides INTEGER DEFAULT 0,
+    total_earnings DECIMAL(10,2) DEFAULT 0.00,
+    documents_verified BOOLEAN DEFAULT false,
+    background_check_status TEXT DEFAULT 'pending'
+);
+
+-- Create rides table
+CREATE TABLE rides (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    passenger_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    driver_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    pickup_location TEXT NOT NULL,
+    pickup_coordinates JSONB NOT NULL,
+    dropoff_location TEXT NOT NULL,
+    dropoff_coordinates JSONB NOT NULL,
+    status ride_status DEFAULT 'pending',
+    fare DECIMAL(8,2) NOT NULL,
+    distance_km DECIMAL(6,2),
+    estimated_duration INTEGER, -- in minutes
+    actual_duration INTEGER, -- in minutes
+    payment_status payment_status DEFAULT 'pending',
+    payment_method TEXT,
+    payment_intent_id TEXT,
+    notes TEXT,
+    cancelled_by UUID REFERENCES profiles(id),
+    cancellation_reason TEXT
+);
+
+-- Create reviews table
+CREATE TABLE reviews (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    ride_id UUID REFERENCES rides(id) ON DELETE CASCADE NOT NULL,
+    reviewer_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    reviewee_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    is_anonymous BOOLEAN DEFAULT false
+);
+
+-- Create notifications table
+CREATE TABLE notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type notification_type DEFAULT 'info',
+    is_read BOOLEAN DEFAULT false,
+    metadata JSONB,
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create ride tracking table (for real-time location updates)
+CREATE TABLE ride_tracking (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    ride_id UUID REFERENCES rides(id) ON DELETE CASCADE NOT NULL,
+    driver_location JSONB NOT NULL,
+    passenger_location JSONB,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    estimated_arrival INTEGER -- in minutes
+);
+
+-- Create support tickets table
+CREATE TABLE support_tickets (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    ride_id UUID REFERENCES rides(id) ON DELETE SET NULL,
+    subject TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    priority TEXT DEFAULT 'medium',
+    assigned_to UUID REFERENCES profiles(id),
+    resolution TEXT,
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create promocodes table
+CREATE TABLE promocodes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    description TEXT,
+    discount_type TEXT NOT NULL, -- 'percentage' or 'fixed'
+    discount_value DECIMAL(8,2) NOT NULL,
+    min_fare DECIMAL(8,2) DEFAULT 0,
+    max_discount DECIMAL(8,2),
+    usage_limit INTEGER,
+    usage_count INTEGER DEFAULT 0,
+    valid_from TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    valid_until TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT true
+);
+
+-- Create ride promocodes junction table
+CREATE TABLE ride_promocodes (
+    ride_id UUID REFERENCES rides(id) ON DELETE CASCADE,
+    promocode_id UUID REFERENCES promocodes(id) ON DELETE CASCADE,
+    discount_applied DECIMAL(8,2) NOT NULL,
+    PRIMARY KEY (ride_id, promocode_id)
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_profiles_user_type ON profiles(user_type);
+CREATE INDEX idx_profiles_email ON profiles(email);
+CREATE INDEX idx_rides_passenger_id ON rides(passenger_id);
+CREATE INDEX idx_rides_driver_id ON rides(driver_id);
+CREATE INDEX idx_rides_status ON rides(status);
+CREATE INDEX idx_rides_created_at ON rides(created_at DESC);
+CREATE INDEX idx_driver_profiles_available ON driver_profiles(is_available);
+CREATE INDEX idx_driver_profiles_location ON driver_profiles USING GIN(current_location);
+CREATE INDEX idx_reviews_ride_id ON reviews(ride_id);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read);
+CREATE INDEX idx_ride_tracking_ride_id ON ride_tracking(ride_id);
+CREATE INDEX idx_ride_tracking_timestamp ON ride_tracking(timestamp DESC);
+
+-- Enable Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE driver_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ride_tracking ENABLE ROW LEVEL SECURITY;
+ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE promocodes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ride_promocodes ENABLE ROW LEVEL SECURITY;
+
+-- Profiles RLS policies
+CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Driver profiles RLS policies
+CREATE POLICY "Drivers can view their own profile" ON driver_profiles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Drivers can update their own profile" ON driver_profiles FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Drivers can insert their own profile" ON driver_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Public can view available drivers" ON driver_profiles FOR SELECT USING (is_available = true);
+
+-- Rides RLS policies
+CREATE POLICY "Passengers can view their rides" ON rides FOR SELECT USING (auth.uid() = passenger_id);
+CREATE POLICY "Drivers can view their rides" ON rides FOR SELECT USING (auth.uid() = driver_id);
+CREATE POLICY "Passengers can create rides" ON rides FOR INSERT WITH CHECK (auth.uid() = passenger_id);
+CREATE POLICY "Drivers can update rides they're assigned to" ON rides FOR UPDATE USING (auth.uid() = driver_id);
+
+-- Reviews RLS policies
+CREATE POLICY "Users can view reviews they wrote" ON reviews FOR SELECT USING (auth.uid() = reviewer_id);
+CREATE POLICY "Users can view reviews about them" ON reviews FOR SELECT USING (auth.uid() = reviewee_id);
+CREATE POLICY "Users can create reviews" ON reviews FOR INSERT WITH CHECK (auth.uid() = reviewer_id);
+
+-- Notifications RLS policies
+CREATE POLICY "Users can view their notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
+-- Ride tracking RLS policies
+CREATE POLICY "Users can view tracking for their rides" ON ride_tracking FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM rides 
+        WHERE rides.id = ride_tracking.ride_id 
+        AND (rides.passenger_id = auth.uid() OR rides.driver_id = auth.uid())
+    )
+);
+
+-- Support tickets RLS policies
+CREATE POLICY "Users can view their tickets" ON support_tickets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create tickets" ON support_tickets FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Functions for automatic profile creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+    INSERT INTO public.profiles (id, email, full_name)
+    VALUES (new.id, new.email, new.raw_user_meta_data->>'full_name');
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger for automatic profile creation
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Function to update timestamps
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = timezone('utc'::text, now());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add update triggers
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_driver_profiles_updated_at BEFORE UPDATE ON driver_profiles
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_rides_updated_at BEFORE UPDATE ON rides
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_support_tickets_updated_at BEFORE UPDATE ON support_tickets
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- Function to calculate ride fare based on distance and time
+CREATE OR REPLACE FUNCTION calculate_fare(distance_km DECIMAL, duration_minutes INTEGER)
+RETURNS DECIMAL AS $$
+BEGIN
+    -- Base fare: $3.00
+    -- Per km: $1.50
+    -- Per minute: $0.25
+    -- Minimum fare: $5.00
+    RETURN GREATEST(5.00, 3.00 + (distance_km * 1.50) + (duration_minutes * 0.25));
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get nearby drivers
+CREATE OR REPLACE FUNCTION get_nearby_drivers(
+    pickup_lat DECIMAL,
+    pickup_lng DECIMAL,
+    radius_km DECIMAL DEFAULT 10
+)
+RETURNS TABLE (
+    driver_id UUID,
+    distance_km DECIMAL,
+    rating DECIMAL,
+    vehicle_info TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        dp.user_id as driver_id,
+        CAST(
+            6371 * acos(
+                cos(radians(pickup_lat)) 
+                * cos(radians(CAST(dp.current_location->>'lat' AS DECIMAL))) 
+                * cos(radians(CAST(dp.current_location->>'lng' AS DECIMAL)) - radians(pickup_lng)) 
+                + sin(radians(pickup_lat)) 
+                * sin(radians(CAST(dp.current_location->>'lat' AS DECIMAL)))
+            ) AS DECIMAL
+        ) as distance_km,
+        dp.rating,
+        CONCAT(dp.vehicle_make, ' ', dp.vehicle_model, ' (', dp.vehicle_color, ')') as vehicle_info
+    FROM driver_profiles dp
+    WHERE dp.is_available = true
+        AND dp.current_location IS NOT NULL
+        AND dp.documents_verified = true
+        AND 6371 * acos(
+            cos(radians(pickup_lat)) 
+            * cos(radians(CAST(dp.current_location->>'lat' AS DECIMAL))) 
+            * cos(radians(CAST(dp.current_location->>'lng' AS DECIMAL)) - radians(pickup_lng)) 
+            + sin(radians(pickup_lat)) 
+            * sin(radians(CAST(dp.current_location->>'lat' AS DECIMAL)))
+        ) <= radius_km
+    ORDER BY distance_km ASC
+    LIMIT 10;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Insert sample data (optional - remove in production)
+-- Sample promocodes
+INSERT INTO promocodes (code, description, discount_type, discount_value, min_fare, valid_until, usage_limit)
+VALUES 
+    ('WELCOME10', 'Welcome bonus - 10% off first ride', 'percentage', 10, 5.00, timezone('utc'::text, now()) + interval '30 days', 1000),
+    ('RYDE5SAVE', 'Save $5 on rides over $20', 'fixed', 5.00, 20.00, timezone('utc'::text, now()) + interval '60 days', 500);
+
+-- Enable realtime for live updates
+ALTER PUBLICATION supabase_realtime ADD TABLE rides;
+ALTER PUBLICATION supabase_realtime ADD TABLE ride_tracking;
+ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE driver_profiles;

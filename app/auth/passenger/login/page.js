@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Mail, Lock } from "lucide-react"
+import { createClient } from '@/lib/supabase/client'
 
 import { Button } from "@/components/ui/buttons"
 import { Input } from "@/components/ui/input"
@@ -16,12 +17,45 @@ export default function PassengerLogin() {
     email: "",
     password: "",
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    // Here you would typically handle the login logic
-    // For now, we'll just redirect to the main application
-    router.push("/main")
+    setLoading(true)
+    setError("")
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (error) {
+        setError(error.message)
+        return
+      }
+
+      if (data.user) {
+        // Check user type from profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', data.user.id)
+          .single()
+
+        if (profile?.user_type === 'passenger') {
+          router.push("/main")
+        } else {
+          setError("Please use the correct login page for your account type.")
+        }
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -59,8 +93,14 @@ export default function PassengerLogin() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full">
-          Sign In
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Signing In..." : "Sign In"}
         </Button>
 
         <div className="text-center space-y-2">
