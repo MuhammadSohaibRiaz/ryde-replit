@@ -1,0 +1,360 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { Eye, EyeOff, Lock, User, AlertTriangle, Clock, Shield } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { useAuth } from "@/lib/auth"
+
+interface AdminAuthProps {
+  onAuthenticated: () => void
+}
+
+export function AdminAuth({ onAuthenticated }: AdminAuthProps) {
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [attempts, setAttempts] = useState(0)
+  const [isLocked, setIsLocked] = useState(false)
+  const [lockTimeRemaining, setLockTimeRemaining] = useState(0)
+  const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0)
+  const [showSessionWarning, setShowSessionWarning] = useState(false)
+
+  const { login, isAuthenticated, extendSession, logout } = useAuth()
+
+  const MAX_ATTEMPTS = 3
+  const LOCKOUT_DURATION = 15 * 60 * 1000 // 15 minutes
+  const SESSION_DURATION = 30 * 60 * 1000 // 30 minutes
+  const WARNING_TIME = 5 * 60 * 1000 // 5 minutes
+
+  useEffect(() => {
+    // Check for existing lockout
+    const lockoutEnd = localStorage.getItem("admin_lockout_end")
+    if (lockoutEnd) {
+      const remaining = Number.parseInt(lockoutEnd) - Date.now()
+      if (remaining > 0) {
+        setIsLocked(true)
+        setLockTimeRemaining(remaining)
+      } else {
+        localStorage.removeItem("admin_lockout_end")
+        localStorage.removeItem("admin_attempts")
+      }
+    }
+
+    // Get current attempts
+    const currentAttempts = localStorage.getItem("admin_attempts")
+    if (currentAttempts) {
+      setAttempts(Number.parseInt(currentAttempts))
+    }
+
+    // Check session
+    if (isAuthenticated) {
+      const sessionEnd = localStorage.getItem("admin_session_end")
+      if (sessionEnd) {
+        const remaining = Number.parseInt(sessionEnd) - Date.now()
+        if (remaining > 0) {
+          setSessionTimeRemaining(remaining)
+          onAuthenticated()
+        } else {
+          logout()
+        }
+      }
+    }
+  }, [isAuthenticated, onAuthenticated, logout])
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+
+    if (isLocked && lockTimeRemaining > 0) {
+      interval = setInterval(() => {
+        setLockTimeRemaining((prev) => {
+          if (prev <= 1000) {
+            setIsLocked(false)
+            setAttempts(0)
+            localStorage.removeItem("admin_lockout_end")
+            localStorage.removeItem("admin_attempts")
+            return 0
+          }
+          return prev - 1000
+        })
+      }, 1000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isLocked, lockTimeRemaining])
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+
+    if (isAuthenticated && sessionTimeRemaining > 0) {
+      interval = setInterval(() => {
+        setSessionTimeRemaining((prev) => {
+          const newTime = prev - 1000
+
+          if (newTime <= WARNING_TIME && newTime > WARNING_TIME - 1000) {
+            setShowSessionWarning(true)
+          }
+
+          if (newTime <= 0) {
+            logout()
+            return 0
+          }
+
+          return newTime
+        })
+      }, 1000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isAuthenticated, sessionTimeRemaining, logout])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (isLocked) return
+
+    setIsLoading(true)
+    setError("")
+
+    try {
+      const success = await login(username, password)
+
+      if (success) {
+        // Reset attempts on successful login
+        setAttempts(0)
+        localStorage.removeItem("admin_attempts")
+        localStorage.removeItem("admin_lockout_end")
+
+        // Set session
+        const sessionEnd = Date.now() + SESSION_DURATION
+        localStorage.setItem("admin_session_end", sessionEnd.toString())
+        setSessionTimeRemaining(SESSION_DURATION)
+
+        onAuthenticated()
+      } else {
+        const newAttempts = attempts + 1
+        setAttempts(newAttempts)
+        localStorage.setItem("admin_attempts", newAttempts.toString())
+
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const lockoutEnd = Date.now() + LOCKOUT_DURATION
+          localStorage.setItem("admin_lockout_end", lockoutEnd.toString())
+          setIsLocked(true)
+          setLockTimeRemaining(LOCKOUT_DURATION)
+          setError("Too many failed attempts. Account locked for 15 minutes.")
+        } else {
+          setError(`Invalid credentials. ${MAX_ATTEMPTS - newAttempts} attempts remaining.`)
+        }
+      }
+    } catch (error) {
+      setError("Authentication failed. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleExtendSession = () => {
+    const newSessionEnd = Date.now() + SESSION_DURATION
+    localStorage.setItem("admin_session_end", newSessionEnd.toString())
+    setSessionTimeRemaining(SESSION_DURATION)
+    setShowSessionWarning(false)
+    extendSession()
+  }
+
+  const formatTime = (ms: number) => {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  if (isAuthenticated && sessionTimeRemaining > 0) {
+    return (
+      <div className="min-h-screen theme-bg theme-transition flex items-center justify-center p-4">
+        <div className="fixed top-4 right-4 z-50">
+          <div className="bg-gray-900/90 backdrop-blur-md rounded-lg p-4 shadow-xl border border-gray-700/50">
+            <div className="flex items-center space-x-2 text-white">
+              <Clock className="w-4 h-4 text-green-400" />
+              <span className="text-sm">Session: {formatTime(sessionTimeRemaining)}</span>
+            </div>
+          </div>
+        </div>
+
+        {showSessionWarning && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-gray-900/95 backdrop-blur-md rounded-lg p-6 shadow-2xl border border-gray-700/50 max-w-md w-full"
+            >
+              <div className="text-center">
+                <AlertTriangle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">Session Expiring Soon</h3>
+                <p className="text-gray-300 mb-6">
+                  Your session will expire in {formatTime(sessionTimeRemaining)}. Would you like to extend it?
+                </p>
+                <div className="flex space-x-3">
+                  <Button onClick={handleExtendSession} className="flex-1 bg-primary hover:bg-primary/90 text-white">
+                    Extend Session
+                  </Button>
+                  <Button
+                    onClick={logout}
+                    variant="outline"
+                    className="flex-1 bg-transparent border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Logout
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen theme-bg theme-transition flex items-center justify-center p-4">
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
+        <motion.div
+          className="absolute inset-0 theme-glow blur-3xl theme-transition opacity-30"
+          animate={{
+            x: ["0%", "100%", "0%"],
+            y: ["0%", "50%", "0%"],
+          }}
+          transition={{
+            duration: 20,
+            repeat: Number.POSITIVE_INFINITY,
+            ease: "linear",
+          }}
+        />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="bg-gray-900/90 backdrop-blur-md rounded-lg p-8 shadow-2xl border border-gray-700/50 w-full max-w-md relative z-10"
+      >
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Admin Access</h1>
+          <p className="text-gray-400">Secure authentication required</p>
+        </div>
+
+        {isLocked ? (
+          <div className="text-center">
+            <Lock className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-2">Account Locked</h3>
+            <p className="text-gray-300 mb-4">
+              Too many failed attempts. Please wait {formatTime(lockTimeRemaining)} before trying again.
+            </p>
+            <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
+              <p className="text-red-300 text-sm">For security reasons, access has been temporarily restricted.</p>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
+                Username
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-primary"
+                  placeholder="Enter username"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-primary"
+                  placeholder="Enter password"
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/20 border border-red-500/30 rounded-lg p-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  <p className="text-red-300 text-sm">{error}</p>
+                </div>
+              </motion.div>
+            )}
+
+            {attempts > 0 && !isLocked && (
+              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                  <p className="text-yellow-300 text-sm">{MAX_ATTEMPTS - attempts} attempts remaining before lockout</p>
+                </div>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-semibold py-3"
+            >
+              {isLoading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Authenticating...</span>
+                </div>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+        )}
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-400 text-xs">Secure access to RapidXTech administration panel</p>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
