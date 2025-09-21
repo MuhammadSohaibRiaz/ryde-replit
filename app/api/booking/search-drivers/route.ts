@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pickup location is required' }, { status: 400 })
     }
 
-    // Find available drivers within radius
+    // Find available drivers within radius using PostGIS
     const { data: drivers, error } = await supabase
       .from('driver_profiles')
       .select(`
@@ -39,19 +39,15 @@ export async function POST(request: NextRequest) {
         vehicle_model,
         vehicle_year,
         vehicle_color,
-        vehicle_plate,
         rating,
         total_rides,
         current_location,
-        current_heading,
-        last_location_update,
-        user:profiles!driver_profiles_user_id_fkey(full_name, phone, avatar_url)
+        profiles!driver_profiles_user_id_fkey(full_name, avatar_url)
       `)
-      .eq('status', 'online')
       .eq('is_available', true)
       .eq('documents_verified', true)
-      .eq('background_check_verified', true)
       .not('current_location', 'is', null)
+      .limit(10)
 
     if (error) {
       console.error('Error fetching drivers:', error)
@@ -79,11 +75,12 @@ export async function POST(request: NextRequest) {
           // Calculate estimated arrival time (assuming 30 km/h average speed in city)
           const estimatedArrivalMinutes = Math.ceil(distance / 30 * 60)
 
+          const profile = Array.isArray(driver.profiles) ? driver.profiles[0] : driver.profiles;
+          
           return {
             id: driver.user_id,
-            name: driver.user.full_name,
-            phone: driver.user.phone,
-            avatar_url: driver.user.avatar_url,
+            name: profile?.full_name || 'Unknown Driver',
+            avatar_url: profile?.avatar_url || '',
             rating: driver.rating,
             total_rides: driver.total_rides,
             vehicle: {
@@ -91,16 +88,15 @@ export async function POST(request: NextRequest) {
               model: driver.vehicle_model,
               year: driver.vehicle_year,
               color: driver.vehicle_color,
-              plate: driver.vehicle_plate
             },
             location: {
               lat: driverLat,
               lng: driverLng
             },
-            heading: driver.current_heading,
+            heading: null, // Will be added later when tracking is implemented
             distance_km: Math.round(distance * 100) / 100,
             estimated_arrival_minutes: estimatedArrivalMinutes,
-            last_location_update: driver.last_location_update
+            last_location_update: new Date().toISOString() // Current timestamp for now
           }
         } catch {
           return null

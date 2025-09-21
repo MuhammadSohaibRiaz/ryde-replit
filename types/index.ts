@@ -116,7 +116,7 @@ export interface BookingState {
   dropoff: Location | null;
   selectedDriver: Driver | null;
   routeDetails: RouteDetails | null;
-  status: 'initial' | 'selecting_location' | 'confirming_locations' | 'finding_drivers' | 'driver_found' | 'driver_accepted' | 'driver_arriving';
+  status: 'initial' | 'selecting_location' | 'confirming_locations' | 'finding_drivers' | 'driver_found' | 'driver_accepted' | 'driver_arriving' | 'no_drivers_found' | 'error';
 }
 
 export interface Notification {

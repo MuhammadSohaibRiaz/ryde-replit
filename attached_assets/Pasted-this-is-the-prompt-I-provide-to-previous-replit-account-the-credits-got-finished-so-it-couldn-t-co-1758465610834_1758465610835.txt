@@ -1,0 +1,43 @@
+this is the prompt I provide to previous replit account, the credits got finished, so it couldn't complete all tasks:
+
+{
+make sure, the auths are working fine, every single page is working fine, i want this to be end-to-end scalable web app using nextjs and supabase, let me know if you need anything from me, I've also updated the googlemapkey for you as well
+
+i want everything to work properly, like the authentication (protect all the required routes), forget password, otp page, the public routes, middlewares
+
+passenger all screens in wokring state with real data, driver all screens in working state with real data, admin all routes in working states with real data, and linked properly with real data, without any error,
+
+benchmarks: fully-seo-optimized, scalable code, clean code, best practices, fully-responsive, and everything good end-to-end
+Also keep in mind, that attached is the script that i've already ran in same supabase project, and also i noticed you're making very advance level scripts like including surge-multilpier, client didn't asked for that, and we didn;t agreed on that, so right now, just analyze the frontend, the things that are available in the frontend only work on that, and make it end-to-end progress and complete your 12 steps that you outline considering the request of not making the system extra, because the UI was approved by the client, thanks
+
+}
+
+
+
+and previously replit has completed around 3 tasks:
+Secure admin access and callbacks correctly
+Write down user security rules
+Use email codes for sign in
+
+and these tasks were left their,
+
+Add booking actions and driver search
+Connect booking parts to real data
+Show driver location and ride status
+Connect driver page to real data
+Connect admin chart to real data
+Connect user history to real data
+Check complete booking process works
+Improve search visibility and device viewing
+Make system secure for launch
+
+
+analyse everything, don't go beyond the UI that is available because it's approved, make the available UI production ready-functionable,
+below are supabase anon key:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5eG5ydHFnc3FkdHhlZWplZG5pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNzEzMjgsImV4cCI6MjA3Mzk0NzMyOH0.TXZEJfBckUG9gFv6ge1z4xrGVHaVM6WFKjazbbhIJK8
+
+supabase service role:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5eG5ydHFnc3FkdHhlZWplZG5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODM3MTMyOCwiZXhwIjoyMDczOTQ3MzI4fQ.ZgJQiMzFhDM5Y-VYE4wUGpPbXIrHWEPzRjCkfSZiqPM
+
+supabase project id:
+https://uyxnrtqgsqdtxeejedni.supabase.co

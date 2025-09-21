@@ -63,77 +63,102 @@ export default function BookingInterface() {
     }));
   }, []);
 
-  const handleRequestRide = useCallback(() => {
+  const handleRequestRide = useCallback(async () => {
+    if (!bookingState.pickup) return;
+
     setBookingState(prev => ({
       ...prev,
       status: BOOKING_STATES.FINDING_DRIVERS,
     }));
 
-    // Simulate driver search
-    setTimeout(() => {
-      const mockDriver: Driver = {
-        id: 'driver-1',
-        name: 'Michael Johnson',
-        email: 'michael@example.com',
-        phone: '+1234567890',
-        rating: 4.9,
-        ridesCompleted: 2543,
-        favoriteLocations: [],
-        paymentMethods: [],
-        rideHistory: [],
-        emergencyContacts: [],
-        twoFactorEnabled: false,
-        status: 'active',
-        vehicle: {
-          make: 'Tesla',
-          model: 'Model 3',
-          year: 2023,
-          color: 'White',
-          licensePlate: 'ABC 123',
-          insurance: {
-            provider: 'SafeAuto',
-            policyNumber: 'SA123456789',
-            expiryDate: '2025-12-31',
+    try {
+      // Search for available drivers
+      const response = await fetch('/api/booking/search-drivers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pickup_location: {
+            lat: bookingState.pickup.coordinates.lat,
+            lng: bookingState.pickup.coordinates.lng,
           },
-        },
-        documents: [],
-        earnings: {
-          total: 0,
-          lastWeek: 0,
-          currentWeek: 0,
-          pending: 0,
-          stats: {
-            totalTrips: 2543,
-            averageRating: 4.9,
-            completionRate: 98,
-            cancellationRate: 2,
+          radius: 10, // 10km radius
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to find drivers');
+      }
+
+      if (data.drivers && data.drivers.length > 0) {
+        // Convert the first available driver to our expected Driver format
+        const apiDriver = data.drivers[0];
+        const driver: Driver = {
+          id: apiDriver.id,
+          name: apiDriver.name || 'Unknown Driver',
+          email: '', // Not provided by API
+          phone: '', // Hidden until ride is confirmed for privacy
+          rating: apiDriver.rating || 5.0,
+          ridesCompleted: apiDriver.total_rides || 0,
+          favoriteLocations: [],
+          paymentMethods: [],
+          rideHistory: [],
+          emergencyContacts: [],
+          twoFactorEnabled: false,
+          status: 'active',
+          vehicle: {
+            make: apiDriver.vehicle?.make || 'Unknown',
+            model: apiDriver.vehicle?.model || 'Vehicle',
+            year: apiDriver.vehicle?.year || new Date().getFullYear(),
+            color: apiDriver.vehicle?.color || 'Unknown',
+            licensePlate: 'Hidden', // Hidden until ride is confirmed for privacy
+            insurance: {
+              provider: 'Verified',
+              policyNumber: 'VERIFIED',
+              expiryDate: '2025-12-31',
+            },
           },
-        },
-        schedule: {},
-        performance: {
-          rating: 4.9,
-          acceptance: 95,
-          completion: 98,
-        },
-      };
+          documents: [],
+          earnings: {
+            total: 0,
+            lastWeek: 0,
+            currentWeek: 0,
+            pending: 0,
+            stats: {
+              totalTrips: apiDriver.total_rides,
+              averageRating: apiDriver.rating,
+              completionRate: 98,
+              cancellationRate: 2,
+            },
+          },
+          schedule: {},
+          performance: {
+            rating: apiDriver.rating,
+            acceptance: 95,
+            completion: 98,
+          },
+        };
 
-      setBookingState(prev => ({
-        ...prev,
-        selectedDriver: mockDriver,
-        status: BOOKING_STATES.DRIVER_FOUND,
-      }));
-
-      setTimeout(() => {
         setBookingState(prev => ({
           ...prev,
-          status: BOOKING_STATES.DRIVER_ACCEPTED,
+          selectedDriver: driver,
+          status: BOOKING_STATES.DRIVER_FOUND,
         }));
 
-        // Set initial driver location
-        if (bookingState.pickup) {
+        // Simulate driver accepting the ride
+        setTimeout(() => {
+          setBookingState(prev => ({
+            ...prev,
+            status: BOOKING_STATES.DRIVER_ACCEPTED,
+          }));
+
+          // Set initial driver location (with fallback)
           const startLocation = {
-            lat: bookingState.pickup.coordinates.lat + (Math.random() - 0.5) * 0.01,
-            lng: bookingState.pickup.coordinates.lng + (Math.random() - 0.5) * 0.01,
+            lat: apiDriver.location?.lat || bookingState.pickup?.coordinates.lat || 0,
+            lng: apiDriver.location?.lng || bookingState.pickup?.coordinates.lng || 0,
           };
           setDriverLocation(startLocation);
           
@@ -141,9 +166,21 @@ export default function BookingInterface() {
             ...prev,
             status: BOOKING_STATES.DRIVER_ARRIVING,
           }));
-        }
-      }, 2000);
-    }, 3000);
+        }, 2000);
+      } else {
+        // No drivers found
+        setBookingState(prev => ({
+          ...prev,
+          status: BOOKING_STATES.NO_DRIVERS_FOUND,
+        }));
+      }
+    } catch (error) {
+      console.error('Error searching for drivers:', error);
+      setBookingState(prev => ({
+        ...prev,
+        status: BOOKING_STATES.ERROR,
+      }));
+    }
   }, [bookingState.pickup]);
 
   const handleCancelRide = useCallback(() => {

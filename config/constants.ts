@@ -25,6 +25,8 @@ export const BOOKING_STATES = {
   DRIVER_FOUND: 'driver_found',
   DRIVER_ACCEPTED: 'driver_accepted',
   DRIVER_ARRIVING: 'driver_arriving',
+  NO_DRIVERS_FOUND: 'no_drivers_found',
+  ERROR: 'error',
 } as const;
 
 export const ROUTES = {
