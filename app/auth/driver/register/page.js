@@ -59,7 +59,7 @@ export default function DriverRegister() {
     try {
       const supabase = createClient()
 
-      // Create auth user
+      // Create auth user - DO NOT include user_type in metadata for security
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -67,7 +67,7 @@ export default function DriverRegister() {
           data: {
             full_name: formData.name,
             phone: formData.phone,
-            user_type: 'driver'
+            registration_type: 'driver' // Only for tracking registration intent
           }
         }
       })

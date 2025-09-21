@@ -25,10 +25,10 @@ export default function Unauthorized() {
           
           <div className="space-y-3">
             <Link href="/" className="block">
-              <Button className="w-full flex items-center justify-center">
+              <button className="w-full flex items-center justify-center px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Go to Homepage
-              </Button>
+              </button>
             </Link>
             
             <Link href="/profile" className="block">

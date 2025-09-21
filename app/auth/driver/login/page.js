@@ -103,16 +103,13 @@ export default function DriverLogin() {
           {loading ? "Signing In..." : "Sign In"}
         </Button>
 
-        <div className="text-center space-y-2">
+        <div className="text-center">
           <p className="text-sm text-gray-600">
             Want to become a driver?{" "}
             <Link href="/auth/driver/register" className="text-orange-600 hover:underline">
               Sign up
             </Link>
           </p>
-          <Link href="/auth/driver/forgot-password" className="text-sm text-orange-600 hover:underline">
-            Forgot password?
-          </Link>
         </div>
       </form>
     </AuthLayout>

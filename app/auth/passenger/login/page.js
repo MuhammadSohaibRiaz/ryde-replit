@@ -103,16 +103,13 @@ export default function PassengerLogin() {
           {loading ? "Signing In..." : "Sign In"}
         </Button>
 
-        <div className="text-center space-y-2">
+        <div className="text-center">
           <p className="text-sm text-gray-600">
             Don't have an account?{" "}
             <Link href="/auth/passenger/register" className="text-orange-600 hover:underline">
               Sign up
             </Link>
           </p>
-          <Link href="/auth/passenger/forgot-password" className="text-sm text-orange-600 hover:underline">
-            Forgot password?
-          </Link>
         </div>
       </form>
     </AuthLayout>

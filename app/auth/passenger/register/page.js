@@ -46,15 +46,14 @@ export default function PassengerRegister() {
     try {
       const supabase = createClient()
 
-      // Create auth user
+      // Create auth user - DO NOT include user_type in metadata for security
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
             full_name: formData.name,
-            phone: formData.phone,
-            user_type: 'passenger'
+            phone: formData.phone
           }
         }
       })

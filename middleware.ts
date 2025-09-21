@@ -34,7 +34,7 @@ export async function middleware(request: NextRequest) {
 
   // Define protected routes
   const protectedRoutes = {
-    passenger: ['/main', '/profile'],
+    passenger: ['/main'],
     driver: ['/driver-profile', '/driver-dashboard'],
     admin: ['/admin'],
     authenticated: ['/profile'] // Routes accessible to any authenticated user
@@ -52,7 +52,7 @@ export async function middleware(request: NextRequest) {
     if (currentPath.startsWith('/driver') || currentPath === '/driver-profile') {
       return NextResponse.redirect(new URL('/auth/driver/login', request.url))
     } else if (currentPath.startsWith('/admin')) {
-      return NextResponse.redirect(new URL('/auth/admin/login', request.url))
+      return NextResponse.redirect(new URL('/auth/passenger/login?message=Admin access restricted', request.url))
     } else {
       return NextResponse.redirect(new URL('/auth/passenger/login', request.url))
     }
@@ -81,6 +81,11 @@ export async function middleware(request: NextRequest) {
 
       if (protectedRoutes.passenger.includes(currentPath) && userType !== 'passenger') {
         return NextResponse.redirect(new URL('/unauthorized', request.url))
+      }
+
+      // Allow any authenticated user to access /profile
+      if (currentPath === '/profile') {
+        // This is handled by the authenticated routes - allow access
       }
 
       // Redirect to appropriate dashboard if user tries to access wrong auth pages

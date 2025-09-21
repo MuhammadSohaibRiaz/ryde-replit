@@ -19,8 +19,10 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (!existingProfile) {
-        // Create profile from user metadata
+        // Create profile from user metadata - SECURE: Default to passenger, never trust client metadata for roles
         const userMetadata = data.user.user_metadata
+        const userType = userMetadata.registration_type === 'driver' ? 'driver' : 'passenger'
+        
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
             full_name: userMetadata.full_name,
             email: data.user.email,
             phone: userMetadata.phone,
-            user_type: userMetadata.user_type || 'passenger',
+            user_type: userType, // Only passenger or driver, never admin from client
             avatar_url: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -38,8 +40,8 @@ export async function GET(request: NextRequest) {
           console.error('Error creating profile:', profileError)
         }
 
-        // If user is a driver, create driver profile entry
-        if (userMetadata.user_type === 'driver') {
+        // If user registered as driver, create driver profile entry
+        if (userMetadata.registration_type === 'driver') {
           const { error: driverProfileError } = await supabase
             .from('driver_profiles')
             .insert({
@@ -63,17 +65,15 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Redirect based on user type
-      const userType = existingProfile?.user_type || data.user.user_metadata?.user_type
+      // Redirect based on user type - SECURE: Use database profile, not client metadata
+      const userMetadata = data.user.user_metadata
+      const userType = existingProfile?.user_type || (userMetadata.registration_type === 'driver' ? 'driver' : 'passenger')
       let redirectPath = next
 
       if (next === '/') {
         switch (userType) {
           case 'driver':
             redirectPath = '/driver-profile'
-            break
-          case 'admin':
-            redirectPath = '/admin'
             break
           default:
             redirectPath = '/main'
