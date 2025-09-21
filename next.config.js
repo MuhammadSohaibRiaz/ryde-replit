@@ -9,6 +9,7 @@ const nextConfig = {
     domains: ['images.pexels.com', 'via.placeholder.com'],
     formats: ['image/webp', 'image/avif'],
   },
+  // Allow all hosts for Replit proxy
   async headers() {
     return [
       {
@@ -16,7 +17,7 @@ const nextConfig = {
         headers: [
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'ALLOWALL',
           },
           {
             key: 'X-Content-Type-Options',
@@ -25,6 +26,10 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
           },
         ],
       },
