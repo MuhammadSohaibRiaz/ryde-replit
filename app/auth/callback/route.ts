@@ -65,15 +65,31 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Redirect based on user type - SECURE: Use database profile, not client metadata
-      const userMetadata = data.user.user_metadata
-      const userType = existingProfile?.user_type || (userMetadata.registration_type === 'driver' ? 'driver' : 'passenger')
+      // Redirect based on user type - SECURE: Always query database for role, never trust metadata
+      let userType = 'passenger'
+      
+      if (existingProfile) {
+        userType = existingProfile.user_type
+      } else {
+        // Re-query database after profile creation to ensure accuracy
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', data.user.id)
+          .single()
+        
+        userType = newProfile?.user_type || 'passenger'
+      }
+
       let redirectPath = next
 
       if (next === '/') {
         switch (userType) {
           case 'driver':
             redirectPath = '/driver-profile'
+            break
+          case 'admin':
+            redirectPath = '/admin'
             break
           default:
             redirectPath = '/main'

@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
   const protectedRoutes = {
     passenger: ['/main'],
     driver: ['/driver-profile', '/driver-dashboard'],
-    admin: ['/admin'],
+    admin: ['/admin', '/onlyforadmin'], // CRITICAL: Protect admin PIN page
     authenticated: ['/profile'] // Routes accessible to any authenticated user
   }
 
@@ -70,8 +70,8 @@ export async function middleware(request: NextRequest) {
 
       const userType = profile?.user_type
 
-      // Check role-based access
-      if (currentPath.startsWith('/admin') && userType !== 'admin') {
+      // Check role-based access - Apply to all admin routes
+      if ((currentPath.startsWith('/admin') || protectedRoutes.admin.includes(currentPath)) && userType !== 'admin') {
         return NextResponse.redirect(new URL('/unauthorized', request.url))
       }
 

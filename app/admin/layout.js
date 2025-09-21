@@ -39,21 +39,42 @@ export default function AdminLayout({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    const checkAuth = () => {
-      const adminPin = localStorage.getItem("adminPin")
-      if (!adminPin) {
-        router.push("/onlyforadmin")
-      } else {
-        setIsAuthenticated(true)
+    const checkAuth = async () => {
+      // SECURITY: Use proper Supabase authentication instead of localStorage PIN
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push("/auth/passenger/login?message=Admin access requires authentication")
+        return
       }
+
+      // Check if user has admin role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.user_type !== 'admin') {
+        router.push("/unauthorized")
+        return
+      }
+
+      setIsAuthenticated(true)
     }
 
     checkAuth()
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("adminPin")
-    router.push("/onlyforadmin")
+  const handleLogout = async () => {
+    // SECURITY: Proper Supabase logout instead of localStorage removal
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/")
   }
 
   if (!isAuthenticated) {
