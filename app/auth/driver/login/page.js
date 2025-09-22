@@ -31,9 +31,9 @@ export default function DriverLogin() {
       const { error } = await supabase.auth.signInWithOtp({
         email: formData.email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/driver-profile`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            user_type_intent: 'driver' // Track login intent for verification
+            user_type_intent: 'driver'
           }
         }
       })

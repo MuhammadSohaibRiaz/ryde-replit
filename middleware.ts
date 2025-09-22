@@ -61,14 +61,26 @@ export async function middleware(request: NextRequest) {
   // If user is authenticated, check role-based access
   if (user && isProtectedRoute) {
     try {
-      // Get user profile to check role
+      // Get user profile to check role and account status
       const { data: profile } = await supabase
         .from('profiles')
-        .select('user_type')
+        .select('user_type, account_status')
         .eq('id', user.id)
         .single()
 
       const userType = profile?.user_type
+      const accountStatus = profile?.account_status
+
+      // Check account status first
+      if (accountStatus === 'suspended' || accountStatus === 'banned') {
+        return NextResponse.redirect(new URL('/auth/account-suspended', request.url))
+      }
+
+      // Check if driver is pending verification and trying to access driver routes
+      if (userType === 'driver' && accountStatus === 'pending_verification' && 
+          (protectedRoutes.driver.includes(currentPath) || currentPath.startsWith('/driver'))) {
+        return NextResponse.redirect(new URL('/auth/verification-pending', request.url))
+      }
 
       // Check role-based access - Apply to all admin routes
       if ((currentPath.startsWith('/admin') || protectedRoutes.admin.includes(currentPath)) && userType !== 'admin') {
