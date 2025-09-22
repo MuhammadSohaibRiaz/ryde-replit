@@ -11,79 +11,62 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data.user) {
-      // Check if profile exists, if not create it
+      // Check if profile exists, if not it should be auto-created by trigger
       const { data: existingProfile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('user_type, account_status, full_name')
         .eq('id', data.user.id)
         .single()
 
-      if (!existingProfile) {
-        // Create profile from user metadata - SECURITY: ALWAYS default to passenger, NEVER trust client for roles
-        const userMetadata = data.user.user_metadata
-        
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            full_name: userMetadata.full_name,
-            email: data.user.email,
-            phone: userMetadata.phone,
-            user_type: 'passenger', // SECURITY: Always passenger by default - no client role assignment
-            avatar_url: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError)
-        }
-
-        // SECURITY: If user wants to be a driver, store as pending application (not auto-approve)
-        if (userMetadata.registration_type === 'driver') {
-          // TODO: Create pending driver application for admin review
-          // This would be stored in a separate table for approval workflow
-          console.log('Driver application submitted for:', data.user.id)
-        }
-      }
-
-      // Redirect based on user type - SECURE: Always query database for role, never trust metadata
-      let userType = 'passenger'
-      
-      if (existingProfile) {
-        userType = existingProfile.user_type
-      } else {
-        // Re-query database after profile creation to ensure accuracy
-        const { data: newProfile } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', data.user.id)
+      // If user registered as driver, check if driver profile needs to be created
+      const userMetadata = data.user.user_metadata
+      if (existingProfile?.user_type === 'driver') {
+        // Check if driver profile exists
+        const { data: driverProfile } = await supabase
+          .from('driver_profiles')
+          .select('verification_status')
+          .eq('user_id', data.user.id)
           .single()
-        
-        userType = newProfile?.user_type || 'passenger'
-      }
 
-      // SECURITY: Whitelist safe redirect paths and ignore client-controlled 'next' for role-based routing
-      const safeRedirectPaths = ['/main', '/profile']
-      let redirectPath = '/main' // Default safe path
-
-      if (next && safeRedirectPaths.includes(next)) {
-        redirectPath = next
-      } else {
-        // Role-based redirect (ignore potentially malicious 'next' parameter)
-        switch (userType) {
-          case 'driver':
-            redirectPath = '/driver-profile'
-            break
-          case 'admin':
-            redirectPath = '/admin'
-            break
-          default:
-            redirectPath = '/main'
+        // If no driver profile and this was a driver registration, create it
+        if (!driverProfile && userMetadata.registration_type === 'driver') {
+          // Driver profile should be created during registration
+          // This is a fallback in case it wasn't created
+          console.log('Driver profile missing for user:', data.user.id)
         }
       }
 
-      return NextResponse.redirect(`${origin}${redirectPath}`)
+      // Update last login timestamp
+      await supabase
+        .from('profiles')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', data.user.id)
+
+      if (existingProfile) {
+        const { user_type, account_status } = existingProfile
+
+        // Handle different account statuses
+        if (account_status === 'suspended' || account_status === 'banned') {
+          return NextResponse.redirect(`${origin}/auth/account-suspended`)
+        }
+
+        // Role-based redirect with verification status check
+        switch (user_type) {
+          case 'driver':
+            if (account_status === 'pending_verification') {
+              return NextResponse.redirect(`${origin}/auth/verification-pending`)
+            }
+            return NextResponse.redirect(`${origin}/driver-profile`)
+          case 'admin':
+            return NextResponse.redirect(`${origin}/admin`)
+          case 'passenger':
+          default:
+            return NextResponse.redirect(`${origin}/main`)
+        }
+      }
+
+      // Fallback redirect if profile not found
+      return NextResponse.redirect(`${origin}/main`)
     }
   }
 

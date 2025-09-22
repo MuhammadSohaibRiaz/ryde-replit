@@ -4,43 +4,179 @@ export interface Database {
       profiles: {
         Row: {
           id: string
-          role: 'passenger' | 'driver' | 'admin'
+          user_type: 'passenger' | 'driver' | 'admin'
           full_name: string
           phone: string | null
           avatar_url: string | null
-          is_verified: boolean
-          is_active: boolean
-          date_of_birth: string | null
-          emergency_contact: string | null
-          emergency_phone: string | null
+          account_status: 'active' | 'pending_verification' | 'suspended' | 'banned'
+          email_verified: boolean
+          email_verified_at: string | null
+          profile_completed: boolean
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          created_at: string
+          updated_at: string
+          last_login_at: string | null
+        }
+        Insert: {
+          id: string
+          user_type?: 'passenger' | 'driver' | 'admin'
+          full_name: string
+          phone?: string | null
+          avatar_url?: string | null
+          account_status?: 'active' | 'pending_verification' | 'suspended' | 'banned'
+          email_verified?: boolean
+          email_verified_at?: string | null
+          profile_completed?: boolean
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          created_at?: string
+          updated_at?: string
+          last_login_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_type?: 'passenger' | 'driver' | 'admin'
+          full_name?: string
+          phone?: string | null
+          avatar_url?: string | null
+          account_status?: 'active' | 'pending_verification' | 'suspended' | 'banned'
+          email_verified?: boolean
+          email_verified_at?: string | null
+          profile_completed?: boolean
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          created_at?: string
+          updated_at?: string
+          last_login_at?: string | null
+        }
+      }
+      driver_profiles: {
+        Row: {
+          user_id: string
+          license_number: string
+          license_expiry_date: string
+          license_state: string
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_year: number
+          vehicle_color: string
+          vehicle_plate_number: string
+          verification_status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+          is_online: boolean
+          can_receive_rides: boolean
+          total_rides: number
+          avg_rating: number
+          documents_submitted_at: string | null
+          verification_completed_at: string | null
+          last_document_update: string | null
+          admin_notes: string | null
+          rejection_reason: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
+          user_id: string
+          license_number: string
+          license_expiry_date: string
+          license_state: string
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_year: number
+          vehicle_color: string
+          vehicle_plate_number: string
+          verification_status?: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+          is_online?: boolean
+          can_receive_rides?: boolean
+          total_rides?: number
+          avg_rating?: number
+          documents_submitted_at?: string | null
+          verification_completed_at?: string | null
+          last_document_update?: string | null
+          admin_notes?: string | null
+          rejection_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          license_number?: string
+          license_expiry_date?: string
+          license_state?: string
+          vehicle_make?: string
+          vehicle_model?: string
+          vehicle_year?: number
+          vehicle_color?: string
+          vehicle_plate_number?: string
+          verification_status?: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+          is_online?: boolean
+          can_receive_rides?: boolean
+          total_rides?: number
+          avg_rating?: number
+          documents_submitted_at?: string | null
+          verification_completed_at?: string | null
+          last_document_update?: string | null
+          admin_notes?: string | null
+          rejection_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      driver_documents: {
+        Row: {
           id: string
-          role?: 'passenger' | 'driver' | 'admin'
-          full_name: string
-          phone?: string | null
-          avatar_url?: string | null
-          is_verified?: boolean
-          is_active?: boolean
-          date_of_birth?: string | null
-          emergency_contact?: string | null
-          emergency_phone?: string | null
+          driver_id: string
+          document_type: 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'background_check' | 'profile_photo' | 'vehicle_photo'
+          file_url: string
+          file_name: string
+          file_size: number
+          mime_type: string
+          status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+          uploaded_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          admin_notes: string | null
+          rejection_reason: string | null
+          is_current: boolean
+          expires_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          driver_id: string
+          document_type: 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'background_check' | 'profile_photo' | 'vehicle_photo'
+          file_url: string
+          file_name: string
+          file_size: number
+          mime_type: string
+          status?: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+          uploaded_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          admin_notes?: string | null
+          rejection_reason?: string | null
+          is_current?: boolean
+          expires_at?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
-          role?: 'passenger' | 'driver' | 'admin'
-          full_name?: string
-          phone?: string | null
-          avatar_url?: string | null
-          is_verified?: boolean
-          is_active?: boolean
-          date_of_birth?: string | null
-          emergency_contact?: string | null
-          emergency_phone?: string | null
+          driver_id?: string
+          document_type?: 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'background_check' | 'profile_photo' | 'vehicle_photo'
+          file_url?: string
+          file_name?: string
+          file_size?: number
+          mime_type?: string
+          status?: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+          uploaded_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          admin_notes?: string | null
+          rejection_reason?: string | null
+          is_current?: boolean
+          expires_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -198,7 +334,10 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      user_role: 'passenger' | 'driver' | 'admin'
+      user_type: 'passenger' | 'driver' | 'admin'
+      account_status: 'active' | 'pending_verification' | 'suspended' | 'banned'
+      verification_status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'resubmission_required'
+      document_type: 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'background_check' | 'profile_photo' | 'vehicle_photo'
       ride_status: 'requested' | 'assigned' | 'arriving' | 'in_progress' | 'completed' | 'canceled'
       driver_status: 'offline' | 'online' | 'busy'
     }
